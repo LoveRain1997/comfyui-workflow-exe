@@ -36,10 +36,11 @@ os.add_dll_directory(os.path.join(PYLIBS, 'pywin32_system32'))  # pywintypes313.
 | PushButton / ToolButton | 次级操作 |
 | SimpleCardWidget / CardWidget | 参数分组容器（Card-HeaderCard 心智） |
 | TextEdit / LineEdit / SpinBox / DoubleSpinBox / Slider | 输入族 |
+| **可编辑 ComboBox（presets）** | **特殊数值参数**：深入插件源码后给预设档位（如百万像素 [0.5,1.0,1.5,2.0,2.5,3.0]）+ 可自由键入；schema 字段 `presets`，值解析 float，非法输入回落默认 |
 | ProgressBar / ProgressRing | 步进进度 / 忙态 |
 | InfoBar.success / error（TOP_RIGHT） | 反馈，禁 alert() |
 | ImageLabel | 缩略图（参考图 / 最近出图） |
-| SmoothScrollArea | 页面滚动 |
+| SmoothScrollArea | 页面滚动 / **高级区局部滚动（§3.4）** |
 
 ## 3. 布局模板（可复用）：图像输出型双列布局
 
@@ -88,6 +89,11 @@ os.add_dll_directory(os.path.join(PYLIBS, 'pywin32_system32'))  # pywintypes313.
 - **「完成后释放显存」CheckBox**（勾=跑完卸载+清缓存；不勾=模型常驻连出更快）——不叫「一次/连续」，用行为描述
 - **[立即释放显存] 独立按钮**——随时可点，只卸载 GPU 权重不清缓存
 - 显存空闲 MB 常驻显示（运行条/显存卡）
+
+### 3.4 高级区局部滚动（必做）
+
+- 高级折叠内容一律包进 `SmoothScrollArea`（透明背景无边框，`setMaximumHeight(420)`）——展开后**卡内局部滚动**，绝不撑爆左列/窗口
+- 次级文本（负面提示词等）置高级区顶部；输入卡只留主提示词（§3.1 不变）
 
 ## 4. 单选 / 多选判定律
 

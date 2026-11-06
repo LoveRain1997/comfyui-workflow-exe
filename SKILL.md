@@ -59,6 +59,8 @@ description: 把 ComfyUI 工作流 JSON 转成可双击的本地独立 exe 程�
 4. **功能矛盾矩阵**（conflict_matrix）随 params_schema 产出并给用户过目（ui-style.md §5）。
 5. **vram_sync_nodes**：类名/字段名命中 卸载|clean|free|unload|offload|内存|显存|GC 即归入；执行期自动覆写，UI 文案「由显存勾选接管」。
 6. **internal 必附一句理由**（G4）；分支冻结后不再属于本 exe 的节点 → 直接移出 plan（不是 internal）。
+7. **特殊参数必须深入插件源码**（不只看 INPUT_TYPES）：grep 插件目录读真实语义/单位/取整/联动（实测例：Goohai「百万像素」= 以 1024² 为单位的总像素，min 0.2/max 50/step 0.1，宽高按倍数取整）→ schema 写 `presets`（常用档位，如 [0.5,1.0,1.5,2.0,2.5,3.0]）+ 真实 min/max/step；ui_generic 自动渲染为可编辑下拉（选档或自由键入）。
+8. **次级文本不占输入卡**：负面提示词等次级 textarea 默认降级到高级区顶部；输入卡只留主提示词。
 
 ## 显存通用功能（自动，不询问）
 

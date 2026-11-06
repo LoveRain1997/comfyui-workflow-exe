@@ -35,7 +35,8 @@ from qfluentwidgets import (FluentWindow, NavigationItemPosition, InfoBar, InfoB
                             CardWidget, SimpleCardWidget, PrimaryPushButton, PushButton,
                             ComboBox, LineEdit, TextEdit, SpinBox, DoubleSpinBox,
                             SwitchButton, CheckBox, ProgressBar, FluentIcon, SubtitleLabel,
-                            CaptionLabel, BodyLabel, ImageLabel, setTheme, Theme, setThemeColor)
+                            CaptionLabel, BodyLabel, ImageLabel, SmoothScrollArea,
+                            setTheme, Theme, setThemeColor)
 
 
 # ============================ serve 桥接（常驻读取线程） ============================
@@ -226,6 +227,14 @@ class GenerateInterface(QWidget):
             w.setPlainText(str(default or ''))
             w.setMinimumHeight(64)
             kind = 'multiline'
+        elif spec.get('presets'):
+            # 特殊数值参数：深入插件源码后给出的预设档位 + 可自由键入（ui-style §2）
+            w = ComboBox(parent)
+            w.setEditable(True)
+            w.addItems([str(p) for p in spec['presets']])
+            cur = default if default is not None else spec['presets'][0]
+            w.setCurrentText(str(cur))
+            kind = 'preset_num'
         elif ctrl == 'combo':
             w = ComboBox(parent)
             _vcombo(w, spec.get('choices') or [default], default)
@@ -296,15 +305,14 @@ class GenerateInterface(QWidget):
         lv.setContentsMargins(0, 0, 0, 0)
         lv.setSpacing(8)
 
-        # 输入卡：core 的 textarea 项（首个为主输入区，≥170px）
+        # 输入卡：仅首个（主）textarea 占大面积；次级文本（负面提示词等）降级到高级区
         text_items = [i for i in self.schema['core'] if i.get('control') == 'textarea']
+        demoted_text = text_items[1:]
         if text_items:
             icard, iv = _card('输入', text_items[0].get('effect'))
             big = self._make(text_items[0], icard)
             big.setMinimumHeight(170)   # ui-style §3.1 主输入面积
             iv.addWidget(big)
-            for extra in text_items[1:]:
-                iv.addWidget(_prow(extra.get('label') or extra['id'], self._make(extra, icard)))
             lv.addWidget(icard)
 
         # 参数卡：core 其余非 app_param 项
@@ -329,15 +337,21 @@ class GenerateInterface(QWidget):
         vv.addWidget(_prow('', self.btn_free, self.vram_cap))
         lv.addWidget(vcard)
 
-        # 高级卡：advanced 全量（field_prefix 大权重组 v1 跳过）
+        # 高级卡：内容包进 SmoothScrollArea 局部滚动（展开后不撑爆窗口，ui-style §3.4）
         acard, av = _card('高级')
         self.adv_toggle = PushButton('展开高级参数', acard)
         self.adv_toggle.clicked.connect(self._toggle_advanced)
         av.addWidget(self.adv_toggle)
-        self.adv_body = QWidget(acard)
-        adv_v = QVBoxLayout(self.adv_body)
-        adv_v.setContentsMargins(0, 6, 0, 0)
+        adv_scroll = SmoothScrollArea(acard)
+        adv_scroll.setWidgetResizable(True)
+        adv_scroll.setStyleSheet('QScrollArea{background:transparent;border:none}')
+        adv_scroll.setMaximumHeight(420)
+        adv_inner = QWidget()
+        adv_v = QVBoxLayout(adv_inner)
+        adv_v.setContentsMargins(0, 6, 0, 6)
         adv_v.setSpacing(8)
+        for item in demoted_text:   # 次级文本（负面提示词等）置顶
+            adv_v.addWidget(_prow(item.get('label') or item['id'], self._make(item, adv_inner)))
         for item in self.schema['advanced']:
             if item.get('field_prefix'):
                 continue
@@ -348,6 +362,8 @@ class GenerateInterface(QWidget):
                 if spec.get('visible_when') and '=' in spec['visible_when']:
                     self._vis_items[spec['id']] = spec['visible_when']
             adv_v.addWidget(gcard)
+        adv_scroll.setWidget(adv_inner)
+        self.adv_body = adv_scroll
         self.adv_body.hide()
         av.addWidget(self.adv_body)
         lv.addWidget(acard)
@@ -447,6 +463,11 @@ class GenerateInterface(QWidget):
                 params[pid] = w.toPlainText()
             elif kind == 'combo':
                 params[pid] = w.currentText()
+            elif kind == 'preset_num':
+                try:
+                    params[pid] = float(w.currentText())
+                except ValueError:
+                    params[pid] = None   # 非法输入置空 → runner 回落 schema 默认
             elif kind in ('int', 'float'):
                 params[pid] = w.value()
             elif kind == 'bool':
