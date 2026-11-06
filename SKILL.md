@@ -31,7 +31,11 @@ description: 把 ComfyUI 工作流 JSON 转成可双击的本地独立 exe 程�
 | `scan.py` | 环境三色报告（✅复用/⬇可补齐/⚠optional/❌需手选）；模型多根递归 | manifest 加 `optional: true` 的模型缺失仅警告 |
 | `cli.py` | `scan`/`schema`/`run`/`serve`；serve 协议 = `INIT → READY → PROGRESS → RESULT`（stdin 每行 params JSON，支持 `CMD release_vram`）；入口 reconfigure UTF-8（坑34） | 协议通用，UI 框架无关 |
 
-**UI 模块不在 pyrunner 里**：每个工作流的 UI 按 ui_plan 单独生成（参照实现见 `templates/reference_ui_moss.py`），但 ServeBridge/serve 协议层直接复用。
+**UI 模块不在 pyrunner 里**：S3 默认装 `templates/ui_generic.py`（schema 驱动，任何工作流开箱即用）；per-flow 精修版用 `--ui` 覆盖（参照 `templates/reference_ui_moss.py`）。
+
+## 仓库安装
+
+本 skill 是自包含 git 仓库：`git clone <repo> ~/.zcode/skills/comfy-workflow-exe`（或软链入 skills 目录）即可安装，详见 README.md。结构 = SKILL.md + references/（2 规范）+ scripts/（5 参数化脚本）+ templates/（pyrunner 基座 + ui_generic + per-flow 参照 + launcher）。
 
 ## 执行流程（S0–S6）
 
@@ -43,7 +47,7 @@ description: 把 ComfyUI 工作流 JSON 转成可双击的本地独立 exe 程�
 | S1B **弹窗询问** | **AskUserQuestion 问用户「哪些输入要保留」**：以工作流节点 id 为锚（展示 node_id+字段+现值），分组给推荐项（提示词类/尺寸类/数量种子/模型选择类），用户多选；未选中一律进「高级」折叠；另问 exe 命名与分支拆分确认。**显存相关一律不问**（全自动）。用户未响应 → 声明按推荐执行 | AI 步骤（模板见 ux-flow.md §2） |
 | S1C UX 规划 | 按 ui-style.md 布局规范出 ui_plan：双列布局/参数行卡/大预览/操作条 | AI 步骤 |
 | S1D 契约 | 机械对位（`s1_gen_plan.py`，多分支用 `--fix-bypass/--fix-activate` 冻结本分支）+ AI 撰写 params_schema / deps_manifest / ui_plan | `python scripts/s1_gen_plan.py --workflow <json> --program <dir> --comfyui <root> [--fix-bypass 66 --fix-activate 70]` |
-| S4 入口 | PyInstaller onefile launcher（frozen 用 sys.argv[0] 定位，坑26）+ 桌面 lnk；多分支逐个构建 | — |
+| S4 入口 | PyInstaller **--noconsole**（无黑框，坑37）launcher（frozen 用 sys.argv[0] 定位，坑26）+ start.bat + 桌面 lnk；多分支逐个构建 | `python scripts/s4_launcher.py --program <dir> --venv <py> [--name <exe名>]` |
 | S5 验收 | 最低分辨率跑通（R1）→ R2 零监听 → R6 显存回落 → UI 冒烟（serve 握手/窗口存活） | `python scripts/s5_accept.py --program <dir> --venv <py> --params smoke.json` |
 | S6 交付 | 报告产物树 + 验收证据 + 已知限制；坑沉入母版 | — |
 
