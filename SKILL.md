@@ -42,14 +42,15 @@ description: 把 ComfyUI 工作流 JSON 转成可双击的本地独立 exe 程�
 | 段 | 动作 | 工具 |
 |----|------|------|
 | S0 侦察 | 工作流节点清单；venv 实测各包 INPUT_TYPES；path_map：枚举执行路径（分叉开关→节点→独有参数→资源占用）；环境模拟三件套 | `python scripts/s0_recon.py --workflow <json> --comfyui <root> --out report.json` |
-| S3 骨架 | 程序根 + 快照闭包 + pyrunner 模板 + PySide6/qfluentwidgets/pywin32 预装（pywin32 路径修复见 ui-style.md §0）+ config.json（`disable_async_offload: true`） | `python scripts/s3_new_program.py --name <名> --workflow <json> --comfyui <root> --venv <py> --models <dir> [--models <dir2>] --input <dir>` |
-| S1A 心智分析 | 四问：用户是谁/心动线/哪个参数在惩罚用户/状态恢复 | AI 步骤 |
-| S1B **弹窗询问** | **AskUserQuestion 问用户「哪些输入要保留」**：以工作流节点 id 为锚（展示 node_id+字段+现值），分组给推荐项（提示词类/尺寸类/数量种子/模型选择类），用户多选；未选中一律进「高级」折叠；另问 exe 命名与分支拆分确认。**显存相关一律不问**（全自动）。用户未响应 → 声明按推荐执行 | AI 步骤（模板见 ux-flow.md §2） |
-| S1C UX 规划 | 按 ui-style.md 布局规范出 ui_plan：双列布局/参数行卡/大预览/操作条 | AI 步骤 |
-| S1D 契约 | 机械对位（`s1_gen_plan.py`，多分支用 `--fix-bypass/--fix-activate` 冻结本分支）+ AI 撰写 params_schema / deps_manifest / ui_plan | `python scripts/s1_gen_plan.py --workflow <json> --program <dir> --comfyui <root> [--fix-bypass 66 --fix-activate 70]` |
+| S1B **弹窗询问（紧贴 S0，最先问）** | 先在回复里给出**完整「节点 id → 字段 → 现值」候选表**，再 AskUserQuestion：Q1 保留哪些输入（multiSelect，以节点 id 为锚，可补充表外 id）；Q2 分支落地（多分支=多 exe）。**显存一律不问**。未响应 → 声明按推荐执行 | AI 步骤（模板见 ux-flow.md §2） |
+| S1A/C 心智+UX 规划 | 心智四问 + 按 ui-style.md 双列布局出 ui_plan（**高级参数默认全部不渲染**） | AI 步骤 |
+| S3 骨架 | 程序根 + 快照闭包 + pyrunner 模板 + PySide6/qfluentwidgets/pywin32 预装（pywin32 路径修复见 ui-style.md §0）+ config.json（`disable_async_offload: true`） | `python scripts/s3_new_program.py --name <名> --workflow <json> --comfyui <root> --venv <py> --models <dir> [--models <dir2>] --input <dir> [--ui <per-flow ui.py>]` |
+| S1D 契约 | 机械对位（`s1_gen_plan.py`，多分支用 `--fix-bypass/--fix-activate/--fix-value` 冻结本分支）+ AI 撰写 params_schema / deps_manifest / ui_plan；**写完回读 plan 断言 fix 生效（坑36）** | `python scripts/s1_gen_plan.py --workflow <json> --program <dir> --comfyui <root> [--fix-bypass 66 --fix-activate 70 --fix-value 79/value=2]` |
 | S4 入口 | PyInstaller **--noconsole**（无黑框，坑37）launcher（frozen 用 sys.argv[0] 定位，坑26）+ start.bat + 桌面 lnk；多分支逐个构建 | `python scripts/s4_launcher.py --program <dir> --venv <py> [--name <exe名>]` |
 | S5 验收 | 最低分辨率跑通（R1）→ R2 零监听 → R6 显存回落 → UI 冒烟（serve 握手/窗口存活） | `python scripts/s5_accept.py --program <dir> --venv <py> --params smoke.json` |
 | S6 交付 | 报告产物树 + 验收证据 + 已知限制；坑沉入母版 | — |
+
+**UI 三禁（用户原则）**：①单路径 exe 内不出现模式/分支切换控件（多分支=多 exe）②高级参数默认**全部不渲染**——弹窗没选的用工作流默认值，需要时走 `--ui` 精修版 ③无 tab 导航——单窗布局，设置走运行条齿轮按钮+模态对话框。
 
 ## 契约硬规则（G1–G6）
 

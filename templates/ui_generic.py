@@ -31,11 +31,11 @@ LOG_FILE = os.path.join(bootstrap.PROG, 'mossapp.log')
 
 from PySide6.QtCore import Qt, QObject, Signal
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QStackedLayout
-from qfluentwidgets import (FluentWindow, NavigationItemPosition, InfoBar, InfoBarPosition,
-                            CardWidget, SimpleCardWidget, PrimaryPushButton, PushButton,
-                            ComboBox, EditableComboBox, LineEdit, TextEdit, SpinBox,
-                            DoubleSpinBox, SwitchButton, CheckBox, ProgressBar, FluentIcon,
-                            SubtitleLabel, CaptionLabel, BodyLabel, ImageLabel, SmoothScrollArea,
+from qfluentwidgets import (InfoBar, InfoBarPosition, CardWidget, SimpleCardWidget,
+                            PrimaryPushButton, PushButton, ToolButton, ComboBox,
+                            EditableComboBox, LineEdit, TextEdit, SpinBox, DoubleSpinBox,
+                            SwitchButton, CheckBox, ProgressBar, FluentIcon, SubtitleLabel,
+                            CaptionLabel, BodyLabel, ImageLabel, SmoothScrollArea,
                             setTheme, Theme, setThemeColor)
 
 
@@ -197,6 +197,8 @@ def _card(title, sub=None):
 
 # ============================ 生成页（schema 驱动，无硬编码字段） ============================
 class GenerateInterface(QWidget):
+    settingsRequested = Signal()   # 运行条齿轮 → 主窗设置对话框
+
     def __init__(self, bridge: ServeBridge, parent=None):
         super().__init__(parent)
         self.setObjectName('generateInterface')
@@ -305,9 +307,8 @@ class GenerateInterface(QWidget):
         lv.setContentsMargins(0, 0, 0, 0)
         lv.setSpacing(8)
 
-        # 输入卡：仅首个（主）textarea 占大面积；次级文本（负面提示词等）降级到高级区
+        # 输入卡：仅首个（主）textarea 占大面积；次级文本（负面提示词等）不渲染（用户原则）
         text_items = [i for i in self.schema['core'] if i.get('control') == 'textarea']
-        demoted_text = text_items[1:]
         if text_items:
             icard, iv = _card('输入', text_items[0].get('effect'))
             big = self._make(text_items[0], icard)
@@ -336,37 +337,7 @@ class GenerateInterface(QWidget):
         self.vram_cap = CaptionLabel('空闲 ? MB', vcard)
         vv.addWidget(_prow('', self.btn_free, self.vram_cap))
         lv.addWidget(vcard)
-
-        # 高级卡：内容包进 SmoothScrollArea 局部滚动（展开后不撑爆窗口，ui-style §3.4）
-        acard, av = _card('高级')
-        self.adv_toggle = PushButton('展开高级参数', acard)
-        self.adv_toggle.clicked.connect(self._toggle_advanced)
-        av.addWidget(self.adv_toggle)
-        adv_scroll = SmoothScrollArea(acard)
-        adv_scroll.setWidgetResizable(True)
-        adv_scroll.setStyleSheet('QScrollArea{background:transparent;border:none}')
-        adv_scroll.setMaximumHeight(420)
-        adv_inner = QWidget()
-        adv_v = QVBoxLayout(adv_inner)
-        adv_v.setContentsMargins(0, 6, 0, 6)
-        adv_v.setSpacing(8)
-        for item in demoted_text:   # 次级文本（负面提示词等）置顶
-            adv_v.addWidget(_prow(item.get('label') or item['id'], self._make(item, adv_inner)))
-        for item in self.schema['advanced']:
-            if item.get('field_prefix'):
-                continue
-            sub = item.get('effect') if len(item.get('effect', '')) < 60 else None
-            gcard, gv = _card(item.get('label') or item['id'], sub)
-            self._bind_item(item, gcard, gv)
-            for spec in self._flat_specs(item):
-                if spec.get('visible_when') and '=' in spec['visible_when']:
-                    self._vis_items[spec['id']] = spec['visible_when']
-            adv_v.addWidget(gcard)
-        adv_scroll.setWidget(adv_inner)
-        self.adv_body = adv_scroll
-        self.adv_body.hide()
-        av.addWidget(self.adv_body)
-        lv.addWidget(acard)
+        # 高级参数默认全部不渲染（用户原则：弹窗没选的就用工作流默认值；需要时用 --ui 精修版或重开弹窗）
         lv.addStretch(1)
 
         # 右列：输出大预览（430px+，点击开原图）
@@ -414,13 +385,17 @@ class GenerateInterface(QWidget):
         self.btn_cancel.setEnabled(False)
         self.progress = ProgressBar(rcard)
         self.status = BodyLabel('就绪', rcard)
+        btn_settings = ToolButton(FluentIcon.SETTING, rcard)
+        btn_settings.setToolTip('设置')
         rh.addWidget(self.btn_run)
         rh.addWidget(self.btn_cancel)
         rh.addWidget(self.progress, 1)
         rh.addWidget(self.status, 0)
+        rh.addWidget(btn_settings)
         root.addWidget(rcard)
         self.btn_run.clicked.connect(self._do_run)
         self.btn_cancel.clicked.connect(self.bridge.cancel)
+        btn_settings.clicked.connect(self.settingsRequested.emit)
         self._refresh_visible()
 
     # ---------- visible_when 联动 ----------
@@ -435,11 +410,6 @@ class GenerateInterface(QWidget):
             cur = src_widget.currentText() if src_kind == 'combo' else str(
                 src_widget.value() if hasattr(src_widget, 'value') else '')
             target.parentWidget().setVisible(str(cur) == want)
-
-    def _toggle_advanced(self):
-        show = self.adv_body.isHidden()
-        self.adv_body.setVisible(show)
-        self.adv_toggle.setText('收起高级参数' if show else '展开高级参数')
 
     # ---------- 输出操作 ----------
     def _open_output_dir(self):
@@ -538,70 +508,80 @@ class GenerateInterface(QWidget):
 
 
 # ============================ 设置页 ============================
-class SettingsInterface(QWidget):
-    def __init__(self, bridge: ServeBridge, gen: GenerateInterface, parent=None):
-        super().__init__(parent)
-        self.setObjectName('settingsInterface')
-        self.cfg = gen.cfg
-        v = QVBoxLayout(self)
-        v.setContentsMargins(24, 12, 24, 12)
-        v.setSpacing(10)
-        v.addWidget(SubtitleLabel('设置'))
-        self.les = {}
-        for label, key in (('Python 环境', 'python_env'), ('ComfyUI 目录（只读）', 'comfyui_dir'),
-                           ('插件目录', 'plugin_dir'), ('输入图目录', 'input_dir'),
-                           ('输出目录', 'output_dir')):
-            le = LineEdit(self)
-            le.setText(str(self.cfg.get(key) or ''))
-            self.les[key] = le
-            v.addWidget(_prow(label, le))
-        le_models = LineEdit(self)
-        le_models.setText(';'.join(self.cfg.get('model_dirs') or []))
-        self.les['model_dirs'] = le_models
-        v.addWidget(_prow('模型目录(;分隔)', le_models))
-        self.async_offload = SwitchButton(self)
-        self.async_offload.setChecked(bool(self.cfg.get('disable_async_offload')))
-        v.addWidget(_prow('禁用异步换装', self.async_offload))
-        v.addWidget(CaptionLabel('显存挤兑原生崩溃防护，推荐开启（坑30）', self))
-        save = PrimaryPushButton('保存设置', self)
-        save.clicked.connect(self._save)
-        v.addWidget(save)
-        v.addStretch(1)
+# ============================ 设置对话框 + 单窗（无 tab 导航，用户原则） ============================
+class MainWindow(QWidget):
+    """单窗：生成页即全部内容；设置走运行条齿轮按钮 → 模态对话框（无 tab 导航）。"""
 
-    def _save(self):
-        self.cfg['python_env'] = self.les['python_env'].text().strip()
-        self.cfg['comfyui_dir'] = self.les['comfyui_dir'].text().strip()
-        self.cfg['plugin_dir'] = self.les['plugin_dir'].text().strip()
-        self.cfg['input_dir'] = self.les['input_dir'].text().strip()
-        self.cfg['output_dir'] = self.les['output_dir'].text().strip()
-        self.cfg['model_dirs'] = [s.strip() for s in self.les['model_dirs'].text().split(';') if s.strip()]
-        self.cfg['disable_async_offload'] = self.async_offload.isChecked()
-        bootstrap.save_config(self.cfg)
-        InfoBar.success(title='已保存', content='重启推理服务后生效（重新打开程序即可）',
-                        orient=Qt.Horizontal, isClosable=True, position=InfoBarPosition.TOP,
-                        duration=5000, parent=self)
-
-
-# ============================ 主窗口 ============================
-class MainWindow(FluentWindow):
     def __init__(self):
         super().__init__()
         setTheme(Theme.DARK)
         setThemeColor('#60CDFF')
+        from .runner import load_schema
+        self.setWindowTitle((load_schema().get('app') or '本地出图') + ' · 本地出图')
+        self.resize(1240, 880)
         self.bridge = ServeBridge()
         self.gen = GenerateInterface(self.bridge)
-        self.sett = SettingsInterface(self.bridge, self.gen)
-        self.addSubInterface(self.gen, FluentIcon.PLAY, '生成')
-        self.addSubInterface(self.sett, FluentIcon.SETTING, '设置', NavigationItemPosition.BOTTOM)
-        self.setWindowTitle((self.gen.schema.get('app') or '本地出图') + ' · 本地出图')
-        self.resize(1240, 880)
+        v = QVBoxLayout(self)
+        v.setContentsMargins(0, 0, 0, 0)
+        v.addWidget(self.gen)
+        self.gen.settingsRequested.connect(self._open_settings)
+
+    def _open_settings(self):
+        from PySide6.QtWidgets import QDialog
+        dlg = QDialog(self)
+        dlg.setWindowTitle('设置')
+        dlg.setFixedWidth(680)
+        v = QVBoxLayout(dlg)
+        v.setContentsMargins(20, 16, 20, 16)
+        v.setSpacing(10)
+        les = {}
+        for label, key in (('Python 环境', 'python_env'), ('ComfyUI 目录（只读）', 'comfyui_dir'),
+                           ('插件目录', 'plugin_dir'), ('输入图目录', 'input_dir'),
+                           ('输出目录', 'output_dir')):
+            le = LineEdit(dlg)
+            le.setText(str(self.gen.cfg.get(key) or ''))
+            les[key] = le
+            v.addWidget(_prow(label, le))
+        le_models = LineEdit(dlg)
+        le_models.setText(';'.join(self.gen.cfg.get('model_dirs') or []))
+        les['model_dirs'] = le_models
+        v.addWidget(_prow('模型目录(;分隔)', le_models))
+        async_offload = SwitchButton(dlg)
+        async_offload.setChecked(bool(self.gen.cfg.get('disable_async_offload')))
+        v.addWidget(_prow('禁用异步换装', async_offload))
+        v.addWidget(CaptionLabel('显存挤兑原生崩溃防护，推荐开启（坑30）；保存后重启程序生效', dlg))
+
+        def save():
+            self.gen.cfg['python_env'] = les['python_env'].text().strip()
+            self.gen.cfg['comfyui_dir'] = les['comfyui_dir'].text().strip()
+            self.gen.cfg['plugin_dir'] = les['plugin_dir'].text().strip()
+            self.gen.cfg['input_dir'] = les['input_dir'].text().strip()
+            self.gen.cfg['output_dir'] = les['output_dir'].text().strip()
+            self.gen.cfg['model_dirs'] = [s.strip() for s in les['model_dirs'].text().split(';') if s.strip()]
+            self.gen.cfg['disable_async_offload'] = async_offload.isChecked()
+            bootstrap.save_config(self.gen.cfg)
+            InfoBar.success(title='已保存', content='重启程序后生效',
+                            orient=Qt.Horizontal, isClosable=True, position=InfoBarPosition.TOP,
+                            duration=4000, parent=self)
+            dlg.accept()
+
+        h = QHBoxLayout()
+        h.addStretch(1)
+        btn_cancel = PushButton('取消', dlg)
+        btn_cancel.clicked.connect(dlg.reject)
+        btn_save = PrimaryPushButton('保存', dlg)
+        btn_save.clicked.connect(save)
+        h.addWidget(btn_cancel)
+        h.addWidget(btn_save)
+        v.addLayout(h)
+        dlg.exec()
 
 
 def run_ui() -> int:
     _fh = logging.FileHandler(LOG_FILE, encoding='utf-8')
     _fh.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
     logging.getLogger().addHandler(_fh)   # 坑33
-    log.info('UI(generic schema 驱动) 启动')
+    log.info('UI(generic schema 驱动·单窗) 启动')
     from PySide6.QtWidgets import QApplication
     app = QApplication.instance() or QApplication(sys.argv)
     w = MainWindow()
