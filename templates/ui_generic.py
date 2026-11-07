@@ -33,9 +33,9 @@ from PySide6.QtCore import Qt, QObject, Signal
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QStackedLayout
 from qfluentwidgets import (FluentWindow, NavigationItemPosition, InfoBar, InfoBarPosition,
                             CardWidget, SimpleCardWidget, PrimaryPushButton, PushButton,
-                            ComboBox, LineEdit, TextEdit, SpinBox, DoubleSpinBox,
-                            SwitchButton, CheckBox, ProgressBar, FluentIcon, SubtitleLabel,
-                            CaptionLabel, BodyLabel, ImageLabel, SmoothScrollArea,
+                            ComboBox, EditableComboBox, LineEdit, TextEdit, SpinBox,
+                            DoubleSpinBox, SwitchButton, CheckBox, ProgressBar, FluentIcon,
+                            SubtitleLabel, CaptionLabel, BodyLabel, ImageLabel, SmoothScrollArea,
                             setTheme, Theme, setThemeColor)
 
 
@@ -229,8 +229,8 @@ class GenerateInterface(QWidget):
             kind = 'multiline'
         elif spec.get('presets'):
             # 特殊数值参数：深入插件源码后给出的预设档位 + 可自由键入（ui-style §2）
-            w = ComboBox(parent)
-            w.setEditable(True)
+            # 坑39：qfluentwidgets 可编辑下拉是 EditableComboBox，ComboBox 无 setEditable
+            w = EditableComboBox(parent)
             w.addItems([str(p) for p in spec['presets']])
             cur = default if default is not None else spec['presets'][0]
             w.setCurrentText(str(cur))

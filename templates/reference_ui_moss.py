@@ -36,10 +36,11 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QStack
                                QFileDialog)
 from qfluentwidgets import (FluentWindow, NavigationItemPosition, SegmentedWidget, InfoBar,
                             InfoBarPosition, CardWidget, SimpleCardWidget, PrimaryPushButton,
-                            PushButton, ToolButton, ComboBox, LineEdit, TextEdit, SpinBox,
-                            DoubleSpinBox, SwitchButton, CheckBox, ProgressBar, FluentIcon,
-                            SubtitleLabel, StrongBodyLabel, CaptionLabel, BodyLabel,
-                            SmoothScrollArea, ImageLabel, setTheme, Theme, setThemeColor)
+                            PushButton, ToolButton, ComboBox, EditableComboBox, LineEdit,
+                            TextEdit, SpinBox, DoubleSpinBox, SwitchButton, CheckBox,
+                            ProgressBar, FluentIcon, SubtitleLabel, StrongBodyLabel,
+                            CaptionLabel, BodyLabel, SmoothScrollArea, ImageLabel,
+                            setTheme, Theme, setThemeColor)
 
 
 # ============================ serve 桥接（常驻读取线程） ============================
@@ -265,11 +266,6 @@ class GenerateInterface(QWidget):
         self.te_user.setMinimumHeight(150)
         self.te_user.setObjectName('text_user')
         iv.addWidget(_prow('需求提示词', self.te_user))
-        self.te_neg = TextEdit(icard)
-        self.te_neg.setPlainText(str(self.defaults.get('text_negative') or ''))
-        self.te_neg.setMinimumHeight(64)
-        self.te_neg.setObjectName('text_negative')
-        iv.addWidget(_prow('负面提示词', self.te_neg))
         self.ref_image = LineEdit(icard)
         self.ref_image.setPlaceholderText('模式③专用，单文件')
         ref_btn = PushButton('选择…', icard)
@@ -285,10 +281,11 @@ class GenerateInterface(QWidget):
         self.spec = ComboBox(pcard)
         _vcombo(self.spec, self._core('spec')['choices'], self.defaults.get('spec'))
         self.spec.currentTextChanged.connect(lambda _: self._apply_spec())
-        self.mp = DoubleSpinBox(pcard)
-        self.mp.setRange(0.25, 4.0); self.mp.setSingleStep(0.05)
-        self.mp.setValue(float(self.defaults.get('mp') or 2.0))
-        self.mp.valueChanged.connect(lambda _: self._update_preview_size())
+        self.mp = EditableComboBox(pcard)   # 坑39 UX：预设档位 + 自由键入（插件真相 0.2–50，单位 1024²）
+        mp_presets = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0]
+        self.mp.addItems([str(p) for p in mp_presets])
+        self.mp.setCurrentText(str(self.defaults.get('mp') or 2.0))
+        self.mp.currentTextChanged.connect(lambda _: self._update_preview_size())
         pv.addWidget(_prow('比例 / 规格', self.ratio, self.spec))
         pv.addWidget(_prow('百万像素', self.mp))
         self.mp_preview = CaptionLabel('', pcard)
@@ -338,14 +335,25 @@ class GenerateInterface(QWidget):
         self.adv_toggle = PushButton('展开高级参数', acard)
         self.adv_toggle.clicked.connect(self._toggle_advanced)
         av.addWidget(self.adv_toggle)
-        self.adv_body = QWidget(acard)
-        adv_v = QVBoxLayout(self.adv_body)
-        adv_v.setContentsMargins(0, 6, 0, 0)
+        adv_scroll = SmoothScrollArea(acard)
+        adv_scroll.setWidgetResizable(True)
+        adv_scroll.setStyleSheet('QScrollArea{background:transparent;border:none}')
+        adv_scroll.setMaximumHeight(420)   # ui-style §3.4 局部滚动，不撑爆窗口
+        adv_inner = QWidget()
+        adv_v = QVBoxLayout(adv_inner)
+        adv_v.setContentsMargins(0, 6, 0, 6)
         adv_v.setSpacing(8)
+        self.te_neg = TextEdit(adv_inner)   # 次级文本置高级区顶部（ui-style §3.4）
+        self.te_neg.setPlainText(str(self.defaults.get('text_negative') or ''))
+        self.te_neg.setMinimumHeight(64)
+        self.te_neg.setObjectName('text_negative')
+        adv_v.addWidget(_prow('负面提示词', self.te_neg))
         adv_v.addWidget(self._adv_ksampler())
         adv_v.addWidget(self._adv_llm())
         adv_v.addWidget(self._adv_lora())
         adv_v.addWidget(self._adv_output())
+        adv_scroll.setWidget(adv_inner)
+        self.adv_body = adv_scroll
         self.adv_body.hide()
         av.addWidget(self.adv_body)
         lv.addWidget(acard)
@@ -445,11 +453,18 @@ class GenerateInterface(QWidget):
         import re
         m = re.match(r'^(\d+):(\d+)$', self.ratio.currentText())
         rw, rh = (int(m.group(1)), int(m.group(2))) if m else (9, 16)
-        px = float(self.mp.value()) * 1e6
+        px = self._mp_value() * 1e6
         scale = (px / (rw * rh)) ** 0.5
         w = round(rw * scale / 16) * 16
         h = round(rh * scale / 16) * 16
         self.mp_preview.setText(f'实际宽高 ≈ {w}×{h}')
+
+    def _mp_value(self):
+        """可编辑下拉的容错解析（非法输入回落 2.0）。"""
+        try:
+            return float(self.mp.currentText())
+        except (TypeError, ValueError):
+            return 2.0
 
     # ---------- 高级 ----------
     def _adv_ksampler(self):
@@ -544,7 +559,7 @@ class GenerateInterface(QWidget):
             'text_negative': self.te_neg.toPlainText(),
             'ref_image': os.path.basename(self.ref_image.text().strip() or 'example.png'),
             'ratio': self.ratio.currentText(), 'spec': self.spec.currentText(),
-            'mp': self.mp.value(), 'merge_preset': self.merge_preset.currentText(),
+            'mp': self._mp_value(), 'merge_preset': self.merge_preset.currentText(),
             'merge_strength': self.merge_strength.value(),
             'batch': self.batch.value(), 'seed': self._int(self.seed.text(), -1),
             'vram_mode': 'once' if self.chk_release.isChecked() else 'continuous',
