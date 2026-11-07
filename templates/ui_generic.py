@@ -240,6 +240,7 @@ class GenerateInterface(QWidget):
         elif ctrl == 'combo':
             w = ComboBox(parent)
             _vcombo(w, spec.get('choices') or [default], default)
+            w.currentTextChanged.connect(lambda _t: self._refresh_visible())   # 档位变化 → visible_when 联动刷新
             kind = 'combo'
         elif ctrl == 'int':
             w = SpinBox(parent)
