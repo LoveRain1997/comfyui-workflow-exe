@@ -6,7 +6,7 @@
 """
 import logging
 
-log = logging.getLogger('mossapp.vram')
+log = logging.getLogger('runner.vram')
 
 
 def apply_mode(executor, manifest, mode: str) -> None:

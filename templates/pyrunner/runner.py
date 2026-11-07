@@ -8,7 +8,7 @@ import logging
 
 from . import bootstrap, vram
 
-log = logging.getLogger('mossapp.runner')
+log = logging.getLogger('runner.runner')
 
 
 def load_schema() -> dict:

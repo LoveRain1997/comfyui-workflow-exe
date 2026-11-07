@@ -18,9 +18,10 @@ description: 把 ComfyUI 工作流 JSON 转成可双击的本地独立 exe 程�
 
 ## 输出位置契约
 
-- 每个分支一个程序根：`D:\ComfyExe\<程序名>\` 或多分支时 `D:\ComfyExe\<程序名>_<分支名>\`
-- 双击入口：`<程序根>\<程序名>.exe`（PyInstaller launcher）+ `start.bat` 备选 + 桌面 `<程序名>.lnk`
-- 程序自包含：`pyrunner/`（通用推理基座）+ `<工作流名>_ui.py`（按 ui_plan 生成）+ engine_snapshot/ + pylibs/ + plugins/ + config.json + 三份契约 JSON
+- 输出根由调用参数 `--out-root` 指定（**无默认值**——skill 不假设任何机器路径）；每个分支一个程序根：`<输出根>/<程序名>\`，多分支时 `<输出根>/<程序名>_<分支名>\`
+- 双击入口：`<程序根>\<程序名>.exe`（PyInstaller --noconsole launcher）+ `start.bat` 备选 + 桌面 `<程序名>.lnk`
+- 程序自包含：`<pkg-name>/`（默认 `runner`，通用推理基座）+ ui.py（ui_generic 或 --ui 精修版）+ engine_snapshot/ + pylibs/ + plugins/ + config.json + 三份契约 JSON
+- `--pkg-name` 命名注意：不得与 ComfyUI 快照内既有顶层包重名（如 `app`——nodes.py 引用快照自带 app 包，冲突即崩）
 
 ## 通用 py 基础脚本设计（templates/pyrunner/，工作流无关）
 
@@ -33,7 +34,7 @@ description: 把 ComfyUI 工作流 JSON 转成可双击的本地独立 exe 程�
 | `scan.py` | 环境三色报告（✅复用/⬇可补齐/⚠optional/❌需手选）；模型多根递归 | manifest 加 `optional: true` 的模型缺失仅警告 |
 | `cli.py` | `scan`/`schema`/`run`/`serve`；serve 协议 = `INIT → READY → PROGRESS → RESULT`（stdin 每行 params JSON，支持 `CMD release_vram`）；入口 reconfigure UTF-8（坑34） | 协议通用，UI 框架无关 |
 
-**UI 模块不在 pyrunner 里**：S3 默认装 `templates/ui_generic.py`（schema 驱动，任何工作流开箱即用）；per-flow 精修版用 `--ui` 覆盖（参照 `templates/reference_ui_moss.py`）。
+**UI 模块不在 pyrunner 里**：S3 默认装 `templates/ui_generic.py`（schema 驱动，任何工作流开箱即用）；per-flow 精修版由 AI 按 ui_plan 现场生成后用 `--ui` 覆盖。
 
 ## 仓库安装
 
@@ -82,6 +83,6 @@ description: 把 ComfyUI 工作流 JSON 转成可双击的本地独立 exe 程�
 
 ## 已知限制（v1）
 
-- ui.py 按 ui_plan 逐工作流生成（参照实现 reference_ui_moss.py）；ServeBridge/serve 协议层通用
+- ui.py 按 ui_plan 逐工作流生成（ui_generic 开箱即用，复杂联动需 AI 精修）；ServeBridge/serve 协议层通用
 - 插件补齐：manifest 无 git_url 的包标记 manual
 - 多分支多 exe 的目录隔离会重复占用快照/依赖磁盘（每分支约 700MB），共享化留 §A

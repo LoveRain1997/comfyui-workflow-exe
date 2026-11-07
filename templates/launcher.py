@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""双击启动器：读 config → 用所选 venv 的 pythonw 拉起 mossapp.ui。"""
+"""双击启动器：读 config → 用所选 venv 的 pythonw 拉起 runner.ui。"""
 import os
 import subprocess
 import sys
@@ -24,7 +24,7 @@ def main():
     if not os.path.isfile(py):
         py = sys.executable
     # CREATE_NO_WINDOW: 不闪黑窗
-    subprocess.Popen([py, '-m', 'mossapp', 'ui'], cwd=PROG,
+    subprocess.Popen([py, '-m', 'runner', 'ui'], cwd=PROG,
                      creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
     return 0
 

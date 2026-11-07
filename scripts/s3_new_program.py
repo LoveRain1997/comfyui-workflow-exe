@@ -1,17 +1,18 @@
 # -*- coding: utf-8 -*-
-"""S3 骨架：程序根 + 快照闭包 + mossapp 模板 + PySide6 预装 + config.json。"""
+"""S3 骨架：程序根 + 快照闭包 + pyrunner 模板（--pkg-name 命名）+ 依赖预装 + config.json。"""
 import argparse, json, os, shutil, subprocess, sys
 
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 ap = argparse.ArgumentParser()
 ap.add_argument('--name', required=True)
 ap.add_argument('--workflow', required=True)
-ap.add_argument('--comfyui', default=r'E:/comfycache/ComfyUI/ComfyUI')
-ap.add_argument('--venv', default=r'E:/comfycache/ComfyUI/ComfyUI/.venv')
+ap.add_argument('--comfyui', required=True, help='ComfyUI 根目录')
+ap.add_argument('--venv', required=True, help='venv 的 python.exe 或根目录')
 ap.add_argument('--models', action='append', default=[], help='模型根，可多次')
 ap.add_argument('--input', default=None, help='输入图目录')
-ap.add_argument('--out-root', default=r'D:/ComfyExe')
-ap.add_argument('--ui', default=None, help='按 ui_plan 生成的 per-flow ui.py')
+ap.add_argument('--out-root', required=True, help='程序输出根目录')
+ap.add_argument('--ui', default=None, help='按 ui_plan 生成的 per-flow ui.py（缺省=通用 ui_generic）')
+ap.add_argument('--pkg-name', default='runner', help='生成的 Python 包名（默认 runner，勿与 ComfyUI 快照内包重名）')
 ap.add_argument('--skill-dir', default=os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 a = ap.parse_args()
 
@@ -36,9 +37,9 @@ for f in ('folder_paths.py', 'nodes.py', 'latent_preview.py', 'node_helpers.py',
     if os.path.isfile(src):
         shutil.copy2(src, os.path.join(SNAP, f))
 
-# ---- mossapp 模板 ----
+# ---- pyrunner 模板（包名由 --pkg-name 指定，默认 runner） ----
 tpl = os.path.join(a.skill_dir, 'templates', 'pyrunner')
-dst = os.path.join(PROG, 'mossapp')
+dst = os.path.join(PROG, a.pkg_name)
 os.makedirs(dst)
 for f in os.listdir(tpl):
     if f.endswith('.py'):
@@ -52,7 +53,7 @@ shutil.copy2(ui_src, os.path.join(dst, 'ui.py'))
 # ---- launcher + bat ----
 shutil.copy2(os.path.join(a.skill_dir, 'templates', 'launcher.py'), os.path.join(PROG, 'launcher.py'))
 with open(os.path.join(PROG, 'start.bat'), 'w', encoding='gbk', errors='replace') as f:
-    f.write('@echo off\r\nrem %s - 双击启动\r\ncd /d "%%~dp0"\r\n"%s" -m mossapp ui\r\nif errorlevel 1 pause\r\n'
+    f.write('@echo off\r\nrem %s - 双击启动\r\ncd /d "%%~dp0"\r\n"%s" -m runner ui\r\nif errorlevel 1 pause\r\n'
             % (a.name, os.path.join(a.venv, 'Scripts', 'pythonw.exe')))
 
 # ---- config.json ----

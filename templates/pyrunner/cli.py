@@ -19,7 +19,7 @@ def main(argv=None):
             pass
     logging.basicConfig(level=logging.INFO, format='%(asctime)s %(name)s %(levelname)s %(message)s',
                         filename=None)  # stdout；UI 模式走文件
-    p = argparse.ArgumentParser(prog='MOSS全能王', description='工作流 JSON → 独立出图程序')
+    p = argparse.ArgumentParser(prog='runner', description='工作流 JSON → 独立出图程序')
     sub = p.add_subparsers(dest='cmd', required=True)
     sp = sub.add_parser('scan', help='环境扫描三色报告')
     sp.add_argument('--json', action='store_true')
@@ -71,7 +71,7 @@ def _serve(args):
         init_payload = {'app': load_schema().get('app'), 'schema': load_schema(),
                         'defaults': default_params(), 'config': reg.cfg, 'scan': scan()}
     except Exception as e:  # noqa
-        init_payload = {'app': 'MOSS', 'schema': {}, 'defaults': {}, 'config': reg.cfg,
+        init_payload = {'app': None, 'schema': {}, 'defaults': {}, 'config': reg.cfg,
                         'scan': {'ok': False, 'error': str(e)}}
     print('INIT ' + json.dumps(init_payload, ensure_ascii=False, default=str), flush=True)
     print('READY', flush=True)

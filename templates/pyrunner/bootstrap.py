@@ -12,7 +12,7 @@ import asyncio
 import types
 import logging
 
-log = logging.getLogger('mossapp')
+log = logging.getLogger('runner')
 
 PROG = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SNAP = os.path.join(PROG, 'engine_snapshot')
@@ -20,8 +20,7 @@ PYLIBS = os.path.join(PROG, 'pylibs')
 PLUGIN_DIR = os.path.join(PROG, 'plugins')
 TEMP_DIR = os.path.join(PROG, 'temp')
 
-REQUIRED_PACKS = ['ComfyUI-MOSS-Merge-Presets', 'ComfyUI-llama_Dapao', 'Goohaitools-comfyui',
-                  'comfyui-easy-use', 'comfyui-impact-pack']
+REQUIRED_PACKS = []   # 纯 manifest 驱动（deps_manifest.custom_nodes）
 
 
 def load_config() -> dict:

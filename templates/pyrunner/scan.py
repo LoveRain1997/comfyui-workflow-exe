@@ -6,7 +6,7 @@ import logging
 
 from . import bootstrap
 
-log = logging.getLogger('mossapp.scan')
+log = logging.getLogger('runner.scan')
 
 
 def scan(deep: bool = False) -> dict:

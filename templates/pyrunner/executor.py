@@ -12,7 +12,7 @@ import os
 
 from . import bootstrap
 
-log = logging.getLogger('mossapp.exec')
+log = logging.getLogger('runner.exec')
 
 
 class Executor:

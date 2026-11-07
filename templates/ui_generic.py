@@ -2,8 +2,8 @@
 """通用 schema 驱动 UI（qfluentwidgets，双列布局）：任何工作流的 params_schema.json 直接渲染。
 
 布局（skill references/ui-style.md §3）：左列 470px 输入/参数/显存/高级折叠 + 右列大预览。
-架构（坑31）：UI 进程零 CUDA；推理在 `mossapp serve` 常驻子进程。
-用法：S3 默认安装为 mossapp/ui.py；per-flow 精修版可整体替换（参照 reference_ui_moss.py）。
+架构（坑31）：UI 进程零 CUDA；推理在 `runner serve` 常驻子进程。
+用法：S3 默认安装为 runner/ui.py；per-flow 精修版可整体替换（参照 reference_ui_moss.py）。
 """
 import os
 import sys
@@ -26,8 +26,8 @@ _ss = os.path.join(_PYLIBS, 'pywin32_system32')
 if os.path.isdir(_ss):
     os.add_dll_directory(_ss)
 
-log = logging.getLogger('mossapp.ui')
-LOG_FILE = os.path.join(bootstrap.PROG, 'mossapp.log')
+log = logging.getLogger('runner.ui')
+LOG_FILE = os.path.join(bootstrap.PROG, 'runner.log')
 
 from PySide6.QtCore import Qt, QObject, Signal
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QStackedLayout
@@ -59,7 +59,7 @@ class ServeBridge(QObject):
         if p is not None and p.poll() is None:
             return p
         p = subprocess.Popen(
-            [sys.executable, '-m', 'mossapp', 'serve'],
+            [sys.executable, '-m', 'runner', 'serve'],
             cwd=bootstrap.PROG, stdin=subprocess.PIPE,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             text=True, encoding='utf-8', errors='replace', bufsize=1,

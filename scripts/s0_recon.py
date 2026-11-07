@@ -5,7 +5,7 @@ import argparse, json, os, sys, re, glob, importlib, contextlib
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 ap = argparse.ArgumentParser()
 ap.add_argument('--workflow', required=True)
-ap.add_argument('--comfyui', default=r'E:/comfycache/ComfyUI/ComfyUI')
+ap.add_argument('--comfyui', required=True, help='ComfyUI 根目录')
 ap.add_argument('--out', default=None)
 a = ap.parse_args()
 

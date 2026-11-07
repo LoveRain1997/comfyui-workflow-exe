@@ -5,7 +5,7 @@ import argparse, json, os, subprocess, sys, glob, time
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 ap = argparse.ArgumentParser()
 ap.add_argument('--program', required=True)
-ap.add_argument('--venv', default=r'E:/comfycache/ComfyUI/ComfyUI/.venv')
+ap.add_argument('--venv', required=True, help='venv 的 python.exe 或根目录')
 ap.add_argument('--params', required=True, help='验收参数 JSON（AI 按 schema 写最低分辨率值）')
 ap.add_argument('--timeout', type=int, default=1800)
 a = ap.parse_args()
