@@ -48,6 +48,26 @@ comfy-workflow-exe/
    `scripts/s1_gen_plan.py ... --fix-bypass <ids> --fix-activate <ids> --fix-value <n/f=v>`（回读断言）
 5. `scripts/s4_launcher.py --program <dir> --venv <py>`（--noconsole 无黑框）
 6. `scripts/s5_accept.py --program <dir> --venv <py> --params smoke.json` → 交付报告
+7. `scripts/s6_ui_check.py --program <dir> --venv <py>` → UI 自检五项（交付前必做）
+
+## CLI 契约（AI 接口）
+
+生成程序的 CLI 是 AI 驱动的正式接口：**stdout = 机器输出（JSON），stderr = 人类日志**。
+
+| 命令 | 用途 |
+|------|------|
+| `runner scan` | 环境三色报告（JSON）；exit 2=缺依赖 3=缺模型 |
+| `runner schema` | 打印 params_schema（参数/类型/范围/枚举） |
+| `runner describe` | **AI 首选入口**：一次给全 schema+defaults+config+scan+合法键清单+示例命令 |
+| `runner run --params p.json [--json] [--progress]` | 出图；`--json`=stdout 纯 JSON（含错误/traceback）；默认带步进心跳 |
+| `runner outputs --last N` | 产物清单（文件/实际 seed/时间，最新优先） |
+| `runner serve` | 常驻推理服务（UI 子进程；协议 INIT→READY→PROGRESS→RESULT，支持 `CMD release_vram`） |
+
+- 参数键 fail-fast：未知键立即报错并列出 `valid_keys`（校验在加载模型前，秒级）
+- exit codes：`0` 成功｜`2` 缺依赖｜`3` 缺模型｜`4` 运行时/参数错误｜`5` 环境不可用
+- 分支冻结在生成期（graph_plan --fix-*），CLI 无分支解冻后门
+
+**AI 典型会话**：`describe` 认识程序 → 改 params → `run --json` → `outputs` 核对 → 交付。
 
 母版设计规范（含实测坑清单）由安装者自行维护，路径写入 SKILL.md 顶部占位即可；本仓库不携带任何用户私有文档。
 

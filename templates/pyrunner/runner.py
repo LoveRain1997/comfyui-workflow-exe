@@ -73,10 +73,8 @@ class Runner:
         return self.ex
 
     def apply_params(self, ex, params: dict):
-        """按 schema binding 把 params 写进 plan；返回 LazyIndex 等。"""
-        mode = params.get('mode')
-        if mode is not None:
-            ex.set_value(79, 'value', int(mode))
+        """按 schema binding 把 params 写进 plan。分支冻结在生成期（graph_plan --fix-*），
+        CLI/UI 无分支解冻后门（不得硬编码节点 id 注入）。"""
         if params.get('seed') is not None:
             seed = int(params['seed'])
             if seed < 0:
