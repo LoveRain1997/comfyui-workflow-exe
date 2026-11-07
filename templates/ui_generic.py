@@ -214,6 +214,7 @@ class GenerateInterface(QWidget):
             self.scan_rep = {'ok': False, 'missing': [], 'items': []}
         self.last_files = []
         self.controls = {}          # param_id -> (widget, kind)
+        self.specs = {}             # param_id -> schema spec（收集时 clamp 用）
         self._vis_items = {}        # 带条件显隐的参数
         self._build_ui()
         self.bridge.progressChanged.connect(self._on_progress)
@@ -232,7 +233,7 @@ class GenerateInterface(QWidget):
         elif spec.get('presets'):
             # 特殊数值参数（ui-style §2）：显式输入框 + 档位按钮排
             # 坑42：可编辑下拉的键入不可发现（用户实测"无法输入"）→ 必须显式 LineEdit
-            # 坑39：qfluentwidgets 可编辑下拉是 EditableComboBox，ComboBox 无 setEditable
+            # 坑46：档位按钮用 PushButton（ToolButton 在深色透明容器上文字不可见）
             wrap = QWidget(parent)
             wv = QVBoxLayout(wrap)
             wv.setContentsMargins(0, 0, 0, 0)
@@ -245,12 +246,13 @@ class GenerateInterface(QWidget):
             ch.setContentsMargins(0, 0, 0, 0)
             ch.setSpacing(4)
             for pv in spec['presets']:
-                b = ToolButton(str(pv), chips)
-                b.setFixedWidth(46)
+                b = PushButton(str(pv), chips)
+                b.setFixedWidth(52)
                 b.clicked.connect(lambda _=False, val=str(pv), e=le: e.setText(val))
                 ch.addWidget(b)
             wv.addWidget(chips)
             self.controls[spec['id']] = (le, 'preset_num')
+            self.specs[spec['id']] = spec
             return wrap
         elif ctrl == 'combo':
             w = ComboBox(parent)
@@ -258,16 +260,13 @@ class GenerateInterface(QWidget):
             w.currentTextChanged.connect(lambda _t: self._refresh_visible())   # 档位变化 → visible_when 联动刷新
             kind = 'combo'
         elif ctrl == 'int':
-            w = SpinBox(parent)
-            w.setRange(int(spec.get('min') or 0), int(spec.get('max') or 999999))
-            w.setValue(int(default or 0))
+            # 坑46：SpinBox/DoubleSpinBox 在本环境渲染空白（值在但文本不显示）→ 数字输入统一 LineEdit，范围在收集时 clamp
+            w = LineEdit(parent)
+            w.setText(str(int(default or 0)))
             kind = 'int'
         elif ctrl in ('slider', 'float'):
-            w = DoubleSpinBox(parent)
-            w.setRange(float(spec.get('min') or 0.0), float(spec.get('max') or 1.0))
-            w.setSingleStep(float(spec.get('step') or 0.01))
-            w.setDecimals(2)
-            w.setValue(float(default or 0.0))
+            w = LineEdit(parent)
+            w.setText(str(float(default or 0.0)))
             kind = 'float'
         elif ctrl == 'toggle':
             w = SwitchButton(parent)
@@ -282,6 +281,7 @@ class GenerateInterface(QWidget):
             w.setText(str(default or ''))
             kind = 'text'
         self.controls[spec['id']] = (w, kind)
+        self.specs[spec['id']] = spec
         return w
 
     def _flat_specs(self, item):
@@ -292,12 +292,14 @@ class GenerateInterface(QWidget):
                 out.append({'id': b['id'], 'label': b.get('label') or b['id'],
                             'control': b.get('control', 'text'), 'choices': b.get('choices'),
                             'min': b.get('min'), 'max': b.get('max'), 'step': b.get('step'),
+                            'presets': b.get('presets'),
                             'default': b.get('default', self.defaults.get(b['id'])),
                             'field': b.get('field')})
         elif not item.get('field_prefix'):
             out.append({'id': item['id'], 'label': item.get('label') or item['id'],
                         'control': item.get('control', 'text'), 'choices': item.get('choices'),
                         'min': item.get('min'), 'max': item.get('max'), 'step': item.get('step'),
+                        'presets': item.get('presets'),   # 坑45：presets 必须透传，否则特殊数值参数永远走错分支
                         'default': item.get('default', self.defaults.get(item['id']))})
         return out
 
@@ -450,12 +452,9 @@ class GenerateInterface(QWidget):
             elif kind == 'combo':
                 params[pid] = w.currentText()
             elif kind == 'preset_num':
-                try:
-                    params[pid] = float(w.text())
-                except ValueError:
-                    params[pid] = None   # 非法输入置空 → runner 回落 schema 默认
+                params[pid] = self._num(w.text(), pid)
             elif kind in ('int', 'float'):
-                params[pid] = w.value()
+                params[pid] = self._num(w.text(), pid)
             elif kind == 'bool':
                 params[pid] = w.isChecked()
             elif kind == 'seed':
@@ -471,8 +470,23 @@ class GenerateInterface(QWidget):
         self.status.setText('提交任务…')
         self.bridge.start_run(params)
 
-    def _on_progress(self, done, total, name):
-        self.progress.setMaximum(max(total, 1))
+    def _num(self, text, pid):
+        """数字解析 + schema 范围 clamp；非法输入回落 schema 默认。"""
+        sp = self.specs.get(pid, {})
+        try:
+            v = float(text)
+        except (TypeError, ValueError):
+            return sp.get('default')
+        mn, mx = sp.get('min'), sp.get('max')
+        if mn is not None:
+            v = max(float(mn), v)
+        if mx is not None:
+            v = min(float(mx), v)
+        if sp.get('control') == 'int':
+            return int(round(v))
+        return v
+
+    def _on_progress(self, done, total, name):        self.progress.setMaximum(max(total, 1))
         self.progress.setValue(done)
         self.status.setText(f'{done}/{total} {name}')
 
