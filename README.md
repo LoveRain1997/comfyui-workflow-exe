@@ -30,7 +30,8 @@ comfy-workflow-exe/
 │   ├─ s1_gen_plan.py       契约：UI→API 对位 + Reroute 塌缩 + 分支冻结(--fix-*)
 │   ├─ s3_new_program.py    骨架：程序根 + 快照闭包 + pyrunner + 通用UI + 依赖预装
 │   ├─ s4_launcher.py       入口：PyInstaller --noconsole exe + start.bat + 桌面 lnk
-│   └─ s5_accept.py         验收：最低分辨率跑通 + VRAM 前后采样 + 零监听审计
+│   ├─ s5_accept.py         验收：最低分辨率跑通 + VRAM 前后采样 + 零监听审计
+│   └─ s6_ui_check.py       UI 自检五项：控件覆盖/默认值/键入clamp/visible_when联动/渲染截图
 └─ templates/
     ├─ pyrunner/            通用推理基座 8 模块（bootstrap/executor/runner/vram/scan/cli…）
     ├─ ui_generic.py        通用 schema 驱动 Fluent UI（任何工作流开箱即用）
