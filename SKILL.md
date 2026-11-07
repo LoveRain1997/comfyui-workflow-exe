@@ -49,7 +49,7 @@ description: 把 ComfyUI 工作流 JSON 转成可双击的本地独立 exe 程�
 | S1B **弹窗询问（紧贴 S0，最先问）** | 先在回复里给出**完整「节点 id → 字段 → 现值」候选表**，再 AskUserQuestion：Q1 保留哪些输入（multiSelect，以节点 id 为锚，可补充表外 id）；Q2 分支落地（多分支=多 exe）。**显存一律不问**。未响应 → 声明按推荐执行 | AI 步骤（模板见 ux-flow.md §2） |
 | S1A/C 心智+UX 规划 | 心智四问 + 按 ui-style.md 双列布局出 ui_plan（**高级参数默认全部不渲染**） | AI 步骤 |
 | S3 骨架 | 程序根 + 快照闭包 + pyrunner 模板 + PySide6/qfluentwidgets/pywin32 预装（pywin32 路径修复见 ui-style.md §0）+ config.json（`disable_async_offload: true`） | `python scripts/s3_new_program.py --name <名> --workflow <json> --comfyui <root> --venv <py> --models <dir> [--models <dir2>] --input <dir> [--ui <per-flow ui.py>]` |
-| S1D 契约 | 机械对位（`s1_gen_plan.py`，多分支用 `--fix-bypass/--fix-activate/--fix-value` 冻结本分支）+ AI 撰写 params_schema / deps_manifest / ui_plan；**写完回读 plan 断言 fix 生效（坑36）** | `python scripts/s1_gen_plan.py --workflow <json> --program <dir> --comfyui <root> [--fix-bypass 66 --fix-activate 70 --fix-value 79/value=2]` |
+| S1D 契约 | 机械对位（`s1_gen_plan.py`，多分支用 `--fix-bypass/--fix-activate/--fix-value` 冻结本分支）+ AI 撰写 params_schema / deps_manifest / ui_plan；**顺序坑：先写 deps_manifest 再跑脚本（--manifest 载入插件包），写完回读 plan 断言 fix 生效（坑36）** | `python scripts/s1_gen_plan.py --workflow <json> --program <dir> --comfyui <root> --manifest <deps_manifest.json> [--fix-bypass 66 --fix-activate 70 --fix-value 79/value=2]` |
 | S4 入口 | PyInstaller **--noconsole**（无黑框，坑37）launcher（frozen 用 sys.argv[0] 定位，坑26）+ start.bat + 桌面 lnk；多分支逐个构建 | `python scripts/s4_launcher.py --program <dir> --venv <py> [--name <exe名>]` |
 | S5 验收 | 最低分辨率跑通（R1）→ R2 零监听 → R6 显存回落 → UI 冒烟（serve 握手/窗口存活） | `python scripts/s5_accept.py --program <dir> --venv <py> --params smoke.json` |
 | S6 交付 | 报告产物树 + 验收证据 + 已知限制；坑沉入母版 | — |

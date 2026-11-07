@@ -9,6 +9,7 @@ ap = argparse.ArgumentParser()
 ap.add_argument('--workflow', required=True)
 ap.add_argument('--program', required=True)
 ap.add_argument('--comfyui', required=True, help='ComfyUI 根目录')
+ap.add_argument('--manifest', default=None, help='deps_manifest.json 路径（插件包导入；S1D 先写 manifest 再跑本脚本）')
 ap.add_argument('--fix-bypass', default='', help='分支冻结：强制旁路节点id，逗号分隔（多exe原则）')
 ap.add_argument('--fix-activate', default='', help='分支冻结：强制激活节点id，逗号分隔')
 ap.add_argument('--fix-value', default='', help='分支冻结：节点/字段=值，分号分隔（如 79/value=2）')
@@ -33,7 +34,7 @@ async def _init():
 quiet(asyncio.run, _init())
 CLASSES = {k: ('core/extras', v) for k, v in _core.NODE_CLASS_MAPPINGS.items()}
 
-manifest_p = os.path.join(a.program, 'deps_manifest.json')
+manifest_p = a.manifest or os.path.join(a.program, 'deps_manifest.json')
 if os.path.isfile(manifest_p):
     sys.path.insert(0, os.path.join(a.comfyui, 'custom_nodes'))
     for entry in json.load(open(manifest_p, encoding='utf-8')).get('custom_nodes', []):
