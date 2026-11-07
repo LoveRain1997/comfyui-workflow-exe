@@ -230,13 +230,28 @@ class GenerateInterface(QWidget):
             w.setMinimumHeight(64)
             kind = 'multiline'
         elif spec.get('presets'):
-            # 特殊数值参数：深入插件源码后给出的预设档位 + 可自由键入（ui-style §2）
+            # 特殊数值参数（ui-style §2）：显式输入框 + 档位按钮排
+            # 坑42：可编辑下拉的键入不可发现（用户实测"无法输入"）→ 必须显式 LineEdit
             # 坑39：qfluentwidgets 可编辑下拉是 EditableComboBox，ComboBox 无 setEditable
-            w = EditableComboBox(parent)
-            w.addItems([str(p) for p in spec['presets']])
-            cur = default if default is not None else spec['presets'][0]
-            w.setCurrentText(str(cur))
-            kind = 'preset_num'
+            wrap = QWidget(parent)
+            wv = QVBoxLayout(wrap)
+            wv.setContentsMargins(0, 0, 0, 0)
+            wv.setSpacing(4)
+            le = LineEdit(wrap)
+            le.setText(str(default if default is not None else spec['presets'][0]))
+            wv.addWidget(le)
+            chips = QWidget(wrap)
+            ch = QHBoxLayout(chips)
+            ch.setContentsMargins(0, 0, 0, 0)
+            ch.setSpacing(4)
+            for pv in spec['presets']:
+                b = ToolButton(str(pv), chips)
+                b.setFixedWidth(46)
+                b.clicked.connect(lambda _=False, val=str(pv), e=le: e.setText(val))
+                ch.addWidget(b)
+            wv.addWidget(chips)
+            self.controls[spec['id']] = (le, 'preset_num')
+            return wrap
         elif ctrl == 'combo':
             w = ComboBox(parent)
             _vcombo(w, spec.get('choices') or [default], default)
@@ -436,7 +451,7 @@ class GenerateInterface(QWidget):
                 params[pid] = w.currentText()
             elif kind == 'preset_num':
                 try:
-                    params[pid] = float(w.currentText())
+                    params[pid] = float(w.text())
                 except ValueError:
                     params[pid] = None   # 非法输入置空 → runner 回落 schema 默认
             elif kind in ('int', 'float'):
