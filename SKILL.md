@@ -9,10 +9,12 @@ description: 把 ComfyUI 工作流 JSON 转成可双击的本地独立 exe 程�
 
 ## 0. 工作原则
 
+- **AI 是向导**：每一步都告诉用户「现在在哪 / 要做什么 / 成功长什么样 / 失败怎么办」；关键节点用弹窗让用户确认，**不自己探测替代用户确认**。
 - **Token 免费，不用节约**：分析全面、方案完整、不省步骤不省说明。
 - **用户意图一句话，exe 就合理**：用户说「这个工作流我只输入文字，你输出图片」→ 界面只暴露文字输入 + 出图输出，其余全部内部默认值。
 - **先交互与用户心智，后技术实现**；显存是通用功能，全自动适配，**不询问用户**。
 - **多分支 = 多 exe**（简单原则）：工作流有几条执行路径就生成几个 exe，每个 exe 只含自己路径的参数，**不做流程分支切换 UI**（不做 switch_map、不做模式段）。
+- **前置铁律：工作流必须先在 ComfyUI 跑通**（用户确认），跑不通先引导排查，不做带病转换。
 
 ## 输出位置契约
 
@@ -37,10 +39,11 @@ description: 把 ComfyUI 工作流 JSON 转成可双击的本地独立 exe 程�
 
 本 skill 是自包含 git 仓库：`git clone <repo> ~/.zcode/skills/comfy-workflow-exe`（或软链入 skills 目录）即可安装，详见 README.md。结构 = SKILL.md + references/（2 规范）+ scripts/（5 参数化脚本）+ templates/（pyrunner 基座 + ui_generic + per-flow 参照 + launcher）。
 
-## 执行流程（S0–S6）
+## 执行流程（S-1 前置门 + S0–S6）
 
 | 段 | 动作 | 工具 |
 |----|------|------|
+| **S-1 前置门：ComfyUI 跑通确认** | **工作流必须先在 ComfyUI 跑通才转 exe**。AI 引导（不自己探测，用户确认为准）：①在 ComfyUI 打开该 JSON → ②查有无红色缺失节点/模型 → ③Queue Prompt 跑一次 → ④确认出图。AskUserQuestion Q0「已在 ComfyUI 跑通？」：跑通→进 S0；没跑通→**进入排查引导**（按报错分支：缺节点=装插件并指路 Manager、缺模型=给下载/定位清单、参数报错=逐项解读），解决后回到①重新确认。**用户没确认跑通，绝不进入 S0** | AskUserQuestion（引导脚本见 ux-flow.md §0） |
 | S0 侦察 | 工作流节点清单；venv 实测各包 INPUT_TYPES；path_map：枚举执行路径（分叉开关→节点→独有参数→资源占用）；环境模拟三件套 | `python scripts/s0_recon.py --workflow <json> --comfyui <root> --out report.json` |
 | S1B **弹窗询问（紧贴 S0，最先问）** | 先在回复里给出**完整「节点 id → 字段 → 现值」候选表**，再 AskUserQuestion：Q1 保留哪些输入（multiSelect，以节点 id 为锚，可补充表外 id）；Q2 分支落地（多分支=多 exe）。**显存一律不问**。未响应 → 声明按推荐执行 | AI 步骤（模板见 ux-flow.md §2） |
 | S1A/C 心智+UX 规划 | 心智四问 + 按 ui-style.md 双列布局出 ui_plan（**高级参数默认全部不渲染**） | AI 步骤 |
